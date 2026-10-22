@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Off-chain merkle tree builder for Stellar Wrap batch claims",
   "scripts": {
+    "deploy": "ts-node deploy-v2.ts",
     "demo": "ts-node merkle.ts",
     "indexer": "ts-node indexer.ts"
   },

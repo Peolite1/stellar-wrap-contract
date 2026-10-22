@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { readFileSync } from 'fs';
 import * as path from 'path';
 import type { IndexerConfig } from './types';
 
@@ -29,12 +30,28 @@ export const SCHEMA_VERSION = 1;
  */
 export const SCHEMA_REQUIRES_REINDEX = false;
 
+function loadDeployment(): { contract_id?: string; admin_address?: string; contracts?: { wrap?: { contract_id?: string; admin_address?: string } } } | null {
+  const manifestPath = path.resolve(
+    process.env.DEPLOYMENT_MANIFEST || path.resolve(__dirname, '../../deployments/manifest.json'),
+  );
+  try {
+    return JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new Error(`Unable to read deployment manifest at ${manifestPath}: ${(error as Error).message}`);
+  }
+}
+
 export function loadConfig(): IndexerConfig {
-  const contractId = process.env.CONTRACT_ID || '';
+  const deployment = process.env.CONTRACT_ID ? null : loadDeployment();
+  const contractId = process.env.CONTRACT_ID
+    || deployment?.contracts?.wrap?.contract_id
+    || deployment?.contract_id
+    || '';
   if (!contractId) {
     throw new Error(
       'CONTRACT_ID environment variable is required. ' +
-      'Set it in pipeline/.env or export CONTRACT_ID=...'
+      'Set it in pipeline/.env, export CONTRACT_ID=..., or provide deployments/manifest.json.'
     );
   }
 
@@ -51,6 +68,6 @@ export function loadConfig(): IndexerConfig {
     reconcile_only: process.argv.includes('--reconcile-only'),
     alert_webhook_url: process.env.ALERT_WEBHOOK_URL || '',
     alert_min_severity: (process.env.ALERT_MIN_SEVERITY || 'warning') as IndexerConfig['alert_min_severity'],
-    expected_admin: process.env.EXPECTED_ADMIN || '',
+    expected_admin: process.env.EXPECTED_ADMIN || deployment?.contracts?.wrap?.admin_address || deployment?.admin_address || '',
   };
 }
